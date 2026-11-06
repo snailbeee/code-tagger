@@ -3,6 +3,13 @@ from pathlib import Path
 
 import pandas as pd
 
+from src.analysis.label_noise import (
+    DEFAULT_RULES,
+    potential_missing_labels,
+    rule_violations,
+    untagged_problems,
+    violating_examples,
+)
 from src.analysis.stats import (
     categorical_stats,
     creation_dates,
@@ -43,6 +50,8 @@ def load_problems_from_json(dataset_dir: Path) -> pd.DataFrame:
 def main() -> None:
     df = load_problems_from_json(DATASET_DIR)
     # print(df.head())
+
+    # Basic statistics
     print(f"\nNumber of problems: {len(df)}")
     print(f"\nProblems per tag:\n {problems_per_tag(df, FOCUS_TAGS)}")
     print(f"\nTags per problem:\n {tags_per_problem(df, FOCUS_TAGS)}")
@@ -60,6 +69,12 @@ def main() -> None:
     print(f"\nCreation dates:\n {creation_dates(df)}")
     print(f"\nProblems per year:\n {problems_per_year(df)}")
     print(f"\nTag share per year:\n {tag_share_per_year(df, FOCUS_TAGS)}")
+
+    # Label noise analysis
+    print(f"\nUntagged problems:\n {untagged_problems(df)}")
+    print(f"\nRule violations:\n {rule_violations(df)}")
+    print(f"\nPotential missing labels:\n {potential_missing_labels(df, FOCUS_TAGS)}")
+    print(f"\nViolating examples:\n {violating_examples(df, DEFAULT_RULES[1])}")
 
 
 if __name__ == "__main__":
