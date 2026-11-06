@@ -1,2 +1,12 @@
 /code_classification_dataset/
 /code_classification_dataset.zip
+
+# Python
+.venv/
+__pycache__/
+
+# Editor
+.vscode/
+
+# macOS
+.DS_Store

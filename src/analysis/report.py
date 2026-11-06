@@ -1,0 +1,66 @@
+import json
+from pathlib import Path
+
+import pandas as pd
+
+from src.analysis.stats import (
+    categorical_stats,
+    creation_dates,
+    length_stats,
+    missing_values,
+    number_invalid_difficulty,
+    problems_per_tag,
+    problems_per_year,
+    tag_cooccurrence_matrix,
+    tag_share_per_year,
+    tags_per_problem,
+)
+from src.constants import (
+    CODE_COL,
+    DATASET_DIR,
+    DIFFICULTY_COL,
+    FOCUS_TAGS,
+    TEXT_COLS,
+)
+
+
+def load_problems_from_json(dataset_dir: Path) -> pd.DataFrame:
+    """
+    Loads problems from JSON files into a DataFrame.
+
+    Args:
+        dataset_dir (Path): The directory containing the problem JSON files.
+
+    Returns:
+        pd.DataFrame: A DataFrame containing the problems data.
+    """
+    problems = [
+        json.loads(path.read_text()) for path in sorted(dataset_dir.glob("*.json"))
+    ]
+    return pd.DataFrame.from_records(problems)
+
+
+def main() -> None:
+    df = load_problems_from_json(DATASET_DIR)
+    # print(df.head())
+    print(f"\nNumber of problems: {len(df)}")
+    print(f"\nProblems per tag:\n {problems_per_tag(df, FOCUS_TAGS)}")
+    print(f"\nTags per problem:\n {tags_per_problem(df, FOCUS_TAGS)}")
+    print(f"\nTag co-occurrence matrix:\n {tag_cooccurrence_matrix(df, FOCUS_TAGS)}")
+    print(f"\nLength statistics:\n {length_stats(df, [*TEXT_COLS, CODE_COL])}")
+    print(
+        f"\nMissing values:\n {missing_values(df, [*TEXT_COLS, CODE_COL, DIFFICULTY_COL])}"
+    )
+    print(
+        f"\nCategorical stats for difficulty:\n {categorical_stats(df, DIFFICULTY_COL)}"
+    )
+    print(
+        f"\nNumber of problems with missing or non-positive difficulty: {number_invalid_difficulty(df)}"
+    )
+    print(f"\nCreation dates:\n {creation_dates(df)}")
+    print(f"\nProblems per year:\n {problems_per_year(df)}")
+    print(f"\nTag share per year:\n {tag_share_per_year(df, FOCUS_TAGS)}")
+
+
+if __name__ == "__main__":
+    main()
