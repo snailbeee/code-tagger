@@ -1,8 +1,10 @@
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import pandas as pd
 
+from src.analysis.keywords import evaluate_combined_patterns, evaluate_patterns
 from src.analysis.label_noise import (
     DEFAULT_RULES,
     potential_missing_labels,
@@ -29,6 +31,32 @@ from src.constants import (
     FOCUS_TAGS,
     TEXT_COLS,
 )
+
+
+@dataclass(frozen=True)
+class EdaResults:
+    """Every statistic shown in the report."""
+
+    n_problems: int
+    focus_tags: tuple[str, ...]
+    # tags
+    problems_per_tags: pd.DataFrame
+    focus_tags_distribution: pd.DataFrame
+    tags_per_problem: pd.Series
+
+    # texts and code
+
+    # difficulty
+
+    # data
+
+    # label quality
+
+    # keyword pattern
+
+
+def compute_eda():
+    return
 
 
 def load_problems_from_json(dataset_dir: Path) -> pd.DataFrame:
@@ -75,6 +103,10 @@ def main() -> None:
     print(f"\nRule violations:\n {rule_violations(df)}")
     print(f"\nPotential missing labels:\n {potential_missing_labels(df, FOCUS_TAGS)}")
     print(f"\nViolating examples:\n {violating_examples(df, DEFAULT_RULES[1])}")
+
+    # Keyword pattern evaluation
+    print(f"\nKeyword pattern evaluation:\n {evaluate_patterns(df)}")
+    print(f"\nCombined keyword pattern evaluation:\n {evaluate_combined_patterns(df)}")
 
 
 if __name__ == "__main__":

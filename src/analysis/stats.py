@@ -1,6 +1,7 @@
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 
+import numpy as np
 import pandas as pd
 
 from src.constants import CODE_COL, CREATED_AT_COL, TAGS_COL, TEXT_COLS
@@ -31,32 +32,21 @@ def problems_per_tag(
     return out.sort_values(by="count", ascending=False, ignore_index=True)
 
 
-def tags_per_problem(
-    df: pd.DataFrame, tags: Sequence[str] | None = None
-) -> pd.DataFrame:
-    """
-    Distribution of the number of tags per problem.
+def tags_per_problem(df: pd.DataFrame, tags: Sequence[str] | None = None) -> pd.Series:
+    """Distribution of the number of tags per problem.
 
     Args:
-        df: problems DataFrame containing a 'tags' column.
-        tags: A sequence of tags to filter the DataFrame by. If None, all tags are considered.
+        df: problems DataFrame.
+        tags: if given, only these tags are counted (e.g. the focus tags).
 
     Returns:
-        A DataFrame with two columns: 'num_tags' and 'count', representing the number of tags per problem and their respective counts.
+        Series indexed by number of tags, values = number of problems.
     """
-    tags_per_problem = df[TAGS_COL].apply(
-        lambda problem_tags: (
-            len(problem_tags)
-            if tags is None
-            else sum(tag in tags for tag in problem_tags)
-        )
-    )
-    counts = Counter(tags_per_problem)
-    out = pd.DataFrame(
-        {"num_tags": list(counts.keys()), "count": list(counts.values())}
-    )
-    out["percentage"] = 100 * out["count"] / out["count"].sum()
-    return out.sort_values(by="num_tags", ascending=True, ignore_index=True)
+    if tags is None:
+        n_tags = df[TAGS_COL].apply(lambda tag_list: len(set(tag_list)))
+    else:
+        n_tags = tag_indicator_matrix(df[TAGS_COL], tags).sum(axis=1)
+    return n_tags.value_counts().sort_index().rename_axis("n_tags").rename("n_problems")
 
 
 def tag_cooccurrence_matrix(
@@ -86,6 +76,34 @@ def tag_cooccurrence_matrix(
                 cooccurrence_matrix[idx_j][idx_i] += 1
 
     return pd.DataFrame(cooccurrence_matrix, index=vocabulary, columns=vocabulary)
+
+
+def tag_vocabulary(tags_list: Iterable[Sequence[str]]) -> list[str]:
+    """Return every distinct tag, most frequent first (ties broken alphabetically)."""
+    counts = Counter(tag for tags in tags_list for tag in set(tags))
+    return sorted(counts, key=lambda tag: (-counts[tag], tag))
+
+
+def tag_indicator_matrix(
+    tags_list: pd.Series, vocabulary: Sequence[str]
+) -> pd.DataFrame:
+    """Binarise a Series of tag lists into a 0/1 DataFrame.
+
+    Args:
+        tag_list: one list of tags per problem.
+        vocabulary: tags to keep, in column order. Tags outside it are ignored.
+
+    Returns:
+        DataFrame indexed like ``tag_lists`` with one int8 column per tag.
+    """
+    position = {tag: j for j, tag in enumerate(vocabulary)}
+    matrix = np.zeros((len(tags_list), len(vocabulary)), dtype=np.int8)
+    for i, tags in enumerate(tags_list):
+        for tag in tags:
+            j = position.get(tag)
+            if j is not None:
+                matrix[i, j] = 1
+    return pd.DataFrame(matrix, index=tags_list.index, columns=list(vocabulary))
 
 
 # --- Data quality --------------------------------------------------------------------
@@ -197,6 +215,18 @@ def number_invalid_difficulty(df: pd.DataFrame) -> int:
     return len(df) - len(valid_difficulty(df))
 
 
+def difficulty_distributions(
+    df: pd.DataFrame, tags: Sequence[str]
+) -> dict[str, pd.Series]:
+    """Valid difficulty values of the problems carrying each tag, plus ``(all)``."""
+    difficulty = valid_difficulty(df)
+    labels = tag_indicator_matrix(df[TAGS_COL], tags).loc[difficulty.index]
+    distributions = {"(all)": difficulty}
+    for tag in tags:
+        distributions[tag] = difficulty[labels[tag] == 1]
+    return distributions
+
+
 def difficulty_by_tag(
     df: pd.DataFrame, tags: Sequence[str] | None = None
 ) -> pd.DataFrame:
@@ -205,8 +235,16 @@ def difficulty_by_tag(
     Returns:
         DataFrame indexed by tag with ``n``, ``mean``, ``median``, ``std``.
     """
-    # TODO
-    return
+    rows = {
+        name: {
+            "n": int(values.size),
+            "mean": values.mean(),
+            "median": values.median(),
+            "std": values.std(),
+        }
+        for name, values in difficulty_distributions(df, tags).items()
+    }
+    return pd.DataFrame.from_dict(rows, orient="index")
 
 
 # --- Time -----------------------------------------------------------------
@@ -226,7 +264,6 @@ def problems_per_year(df: pd.DataFrame) -> pd.Series:
 
 def tag_share_per_year(df: pd.DataFrame, tags: Sequence[str]) -> pd.DataFrame:
     """Share of problems carrying each tag, per creation year (detects drift)."""
-    # labels = tag_indicator_matrix(df[TAGS_COL], tags)
-    # labels["year"] = creation_dates(df).dt.year
-    # return labels.groupby("year").mean()
-    return
+    labels = tag_indicator_matrix(df[TAGS_COL], tags)
+    labels["year"] = creation_dates(df).dt.year
+    return labels.groupby("year").mean()
